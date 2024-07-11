@@ -3748,7 +3748,7 @@ int smblib_night_charging_func(struct smb_charger *chg,
 		pre_night_chg_flag = 0;
 	}
 
-	val->intval = chg->night_chg_flag;
+	val->intval = !chg->night_chg_flag;
 
 	return 0;
 }
