@@ -3714,29 +3714,24 @@ int smblib_night_charging_func(struct smb_charger *chg,
 {
 	union power_supply_propval pval = {0, };
 	static int pre_night_chg_flag = 0;
-	int capacity, battery_input_suspend;
+	int battery_input_suspend;
 	int rc = 0;
 
-	rc = smblib_get_prop_batt_capacity(chg, &pval);
-	capacity = pval.intval;
 	rc = smblib_get_prop_battery_input_suspend(chg, &pval);
 	battery_input_suspend = pval.intval;
-	pr_info("nchg_func:capacity:%d, battery_input_suspend:%d.\n",
-			capacity, battery_input_suspend);
+	pr_info("nchg_func:battery_input_suspend:%d.\n",
+			battery_input_suspend);
 	pr_info("nchg_func:pre_nchg:%d, nchg:%d.\n",
 			pre_night_chg_flag, chg->night_chg_flag);
 
-	if (pre_night_chg_flag != chg->night_chg_flag) {
-		if (chg->night_chg_flag && capacity >= 80) {
-			pval.intval = 1;
-			rc = smblib_set_prop_battery_input_suspend(chg, &pval);
-			pr_err("nchg_func:opne night charging.\n");
-			pre_night_chg_flag = chg->night_chg_flag;
-		}
+	if (!pre_night_chg_flag && chg->night_chg_flag) {
+		pval.intval = 1;
+		rc = smblib_set_prop_battery_input_suspend(chg, &pval);
+		pr_err("nchg_func:opne night charging.\n");
+		pre_night_chg_flag = chg->night_chg_flag;
 	}
 
-	if (battery_input_suspend &&
-			(!chg->night_chg_flag || capacity <= 75)) {
+	if (battery_input_suspend && !chg->night_chg_flag) {
 		pval.intval = 0;
 		smblib_set_prop_battery_input_suspend(chg, &pval);
 		pr_err("nchg_func:close night charging.\n");
