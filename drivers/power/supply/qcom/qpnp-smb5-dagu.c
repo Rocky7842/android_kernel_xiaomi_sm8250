@@ -3029,7 +3029,7 @@ static enum power_supply_property smb5_batt_props[] = {
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_RECHARGE_SOC,
 	POWER_SUPPLY_PROP_RECHARGE_VBAT,
-	POWER_SUPPLY_PROP_NIGHT_CHARGING,
+	POWER_SUPPLY_PROP_CHARGING_ENABLED,
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_FORCE_RECHARGE,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
@@ -3218,7 +3218,7 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_STEP_VFLOAT_INDEX:
 		val->intval = chg->index_vfloat;
 		break;
-	case POWER_SUPPLY_PROP_NIGHT_CHARGING:
+	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 		rc = smblib_night_charging_func(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_SMART_BATTERY:
@@ -3357,8 +3357,8 @@ static int smb5_batt_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_WARM_FAKE_CHARGING:
 		chg->warm_fake_charging = val->intval;
 		break;
-	case POWER_SUPPLY_PROP_NIGHT_CHARGING:
-		chg->night_chg_flag = val->intval;
+	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
+		chg->night_chg_flag = !val->intval;
 		break;
 	case POWER_SUPPLY_PROP_SMART_BATTERY:
 		rc = smblib_set_prop_smart_battery_enabled(chg, val);
@@ -3392,7 +3392,7 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_DC_THERMAL_LEVELS:
 	case POWER_SUPPLY_PROP_WARM_FAKE_CHARGING:
 	case POWER_SUPPLY_PROP_RECHARGE_VBAT:
-	case POWER_SUPPLY_PROP_NIGHT_CHARGING:
+	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_SMART_BATTERY:
 		return 1;
 	default:
