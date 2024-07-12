@@ -2732,6 +2732,11 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 		}
 	}
 
+	if (chg->night_chg_flag) {
+		val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+		return 0;
+	}
+
 	chg_en = !(get_client_vote_locked(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER)
 			== MAIN_CHG_SUSPEND_ICL);
 
