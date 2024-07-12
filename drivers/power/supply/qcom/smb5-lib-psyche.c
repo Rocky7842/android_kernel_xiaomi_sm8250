@@ -2419,7 +2419,7 @@ int smblib_get_prop_battery_input_suspend(struct smb_charger *chg,
 				  union power_supply_propval *val)
 {
 	val->intval
-		= (get_client_vote(chg->fcc_votable, USER_VOTER) == 0);
+		= (get_client_vote(chg->fcc_votable, USER_VOTER) == 85000);
 	return 0;
 }
 
@@ -3199,8 +3199,8 @@ int smblib_set_prop_battery_input_suspend(struct smb_charger *chg,
 {
 	int rc;
 
-	/* vote 0mA when battery suspended */
-	rc = vote(chg->fcc_votable, USER_VOTER, (bool)val->intval, 0);
+	/* vote 85mA when battery suspended */
+	rc = vote(chg->fcc_votable, USER_VOTER, (bool)val->intval, 85000);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't vote to %s fcc rc=%d\n",
 			(bool)val->intval ? "suspend" : "resume", rc);
