@@ -644,7 +644,7 @@ static void taper_fcc_step_chg(struct step_chg_info *chip, int index,
 static int handle_step_chg_config(struct step_chg_info *chip)
 {
 	union power_supply_propval pval = {0, };
-	int rc = 0, fcc_ua = 0, current_index, fv_uv = 0, update_now = 0;
+	int rc = 0, fcc_ua = 0, current_index, fv_uv = 0, update_now = 0, night_charging = 0;
 	u64 elapsed_us;
 
 	static int usb_present;
@@ -728,13 +728,21 @@ static int handle_step_chg_config(struct step_chg_info *chip)
 	if (!chip->fcc_votable)
 		return -EINVAL;
 
-	if (chip->taper_fcc) {
-		taper_fcc_step_chg(chip, chip->step_index, pval.intval);
+	rc = power_supply_get_property(chip->bms_psy,
+				POWER_SUPPLY_PROP_BATTERY_INPUT_SUSPEND, &pval);
+	night_charging = pval.intval;
+
+	if (night_charging) {
+		pr_info("night charging enabled, skip adjusting fcc");
 	} else {
-		fcc_ua = chip->step_chg_config->fcc_cfg[chip->step_index].value;
-		vote(chip->fcc_votable, STEP_CHG_VOTER, true, fcc_ua);
-		pr_info("%s: STEP_CHG_VOTER: index:%d fcc_ua:%d.\n",
-				__func__, chip->step_index, fcc_ua);
+		if (chip->taper_fcc) {
+			taper_fcc_step_chg(chip, chip->step_index, pval.intval);
+		} else {
+			fcc_ua = chip->step_chg_config->fcc_cfg[chip->step_index].value;
+			vote(chip->fcc_votable, STEP_CHG_VOTER, true, fcc_ua);
+			pr_info("%s: STEP_CHG_VOTER: index:%d fcc_ua:%d.\n",
+					__func__, chip->step_index, fcc_ua);
+		}
 	}
 
 	pr_info("%s = %d Step-FCC = %duA taper-fcc: %d\n",
@@ -745,7 +753,7 @@ static int handle_step_chg_config(struct step_chg_info *chip)
 	if (chip->use_bq_gauge) {
 		rc = power_supply_get_property(chip->bms_psy,
 				POWER_SUPPLY_PROP_CURRENT_MAX, &pval);
-		if (rc >= 0 && chip->fcc_votable && pval.intval > 0)
+		if (rc >= 0 && chip->fcc_votable && pval.intval > 0 && !night_charging)
 			vote(chip->fcc_votable, STEP_BMS_CHG_VOTER, false, pval.intval);
 		fcc_ua = pval.intval;
 
