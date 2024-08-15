@@ -5076,12 +5076,9 @@ error:
 static ssize_t sysfs_dc_dimming_read(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	int ret;
-	bool dc_dimming_mode = ea_panel_is_enabled();
+	struct dsi_display *display = dev_get_drvdata(dev);
 
-	ret = scnprintf(buf, PAGE_SIZE, "%d\n", dc_dimming_mode ? 1 : 0);
-
-	return ret;
+	return scnprintf(buf, PAGE_SIZE, "%d\n", display->panel->dc_dimming_mode ? 1 : 0);
 }
 
 static ssize_t sysfs_dc_dimming_write(struct device *dev,
@@ -5098,6 +5095,7 @@ static ssize_t sysfs_dc_dimming_write(struct device *dev,
 		return count;
 	}
 
+	display->panel->dc_dimming_mode = dc_dimming_mode;
 	if (!display->panel->hbm_mode)
 		ea_panel_mode_ctrl(display->panel, dc_dimming_mode != 0);
 

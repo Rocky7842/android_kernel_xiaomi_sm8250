@@ -4684,6 +4684,8 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 
 	if (panel->hbm_mode)
 		dsi_panel_apply_hbm_mode(panel, 0);
+	else if (panel->dc_dimming_mode)
+		ea_panel_mode_ctrl(panel, 0);
 
 	mutex_lock(&panel->panel_lock);
 	if (!panel->panel_initialized)
@@ -4732,6 +4734,8 @@ int dsi_panel_set_lp2(struct dsi_panel *panel)
 
 	if (panel->hbm_mode)
 		dsi_panel_apply_hbm_mode(panel, 0);
+	else if (panel->dc_dimming_mode)
+		ea_panel_mode_ctrl(panel, 0);
 
 	mutex_lock(&panel->panel_lock);
 	if (!panel->panel_initialized)
@@ -4760,6 +4764,8 @@ int dsi_panel_set_nolp(struct dsi_panel *panel)
 
 	if (panel->hbm_mode)
 		dsi_panel_apply_hbm_mode(panel, panel->hbm_mode);
+	else if (panel->dc_dimming_mode)
+		ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
 
 	mutex_lock(&panel->panel_lock);
 
@@ -5184,6 +5190,8 @@ int dsi_panel_enable(struct dsi_panel *panel)
 
 	if (panel->hbm_mode)
 		dsi_panel_apply_hbm_mode(panel, panel->hbm_mode);
+	else if (panel->dc_dimming_mode)
+		ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
 
 	mutex_lock(&panel->panel_lock);
 
