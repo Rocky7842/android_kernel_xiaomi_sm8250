@@ -22,6 +22,7 @@
 #include "dsi_pwr.h"
 #include "sde_dbg.h"
 #include "dsi_parser.h"
+#include "exposure_adjustment.h"
 
 #define to_dsi_display(x) container_of(x, struct dsi_display, host)
 #define INT_BASE_10 10
@@ -5072,6 +5073,40 @@ error:
 	return rc;
 }
 
+static ssize_t sysfs_dc_dimming_read(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int ret;
+	bool dc_dimming_mode = ea_panel_is_enabled();
+
+	ret = scnprintf(buf, PAGE_SIZE, "%d\n", dc_dimming_mode ? 1 : 0);
+
+	return ret;
+}
+
+static ssize_t sysfs_dc_dimming_write(struct device *dev,
+	    struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct dsi_display *display = dev_get_drvdata(dev);
+	u32 dc_dimming_mode;
+
+	if (!display->panel)
+		return 0;
+
+	if (sscanf(buf, "%d", &dc_dimming_mode) != 1) {
+		DSI_ERR("sccanf buf error!\n");
+		return count;
+	}
+
+	ea_panel_mode_ctrl(display->panel, dc_dimming_mode != 0);
+
+	return count;
+}
+
+static DEVICE_ATTR(dc_dimming, 0644,
+			sysfs_dc_dimming_read,
+			sysfs_dc_dimming_write);
+
 static ssize_t sysfs_hbm_read(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -5163,6 +5198,7 @@ static DEVICE_ATTR(fod_ui, 0444,
 static struct attribute *display_fs_attrs[] = {
 	&dev_attr_fod_ui.attr,
 	&dev_attr_hbm.attr,
+	&dev_attr_dc_dimming.attr,
 	NULL,
 };
 
