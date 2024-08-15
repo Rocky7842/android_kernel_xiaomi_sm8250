@@ -4680,6 +4680,10 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 		DSI_ERR("invalid params\n");
 		return -EINVAL;
 	}
+	panel->doze_status = 1;
+
+	if (panel->hbm_mode)
+		dsi_panel_apply_hbm_mode(panel, 0);
 
 	mutex_lock(&panel->panel_lock);
 	if (!panel->panel_initialized)
@@ -4718,10 +4722,16 @@ int dsi_panel_set_lp2(struct dsi_panel *panel)
 
 	mi_cfg = &panel->mi_cfg;
 	mi_cfg->hbm_enabled = false;
+
 	if (!panel) {
 		DSI_ERR("invalid params\n");
 		return -EINVAL;
 	}
+
+	panel->doze_status = 1;
+
+	if (panel->hbm_mode)
+		dsi_panel_apply_hbm_mode(panel, 0);
 
 	mutex_lock(&panel->panel_lock);
 	if (!panel->panel_initialized)
@@ -4745,6 +4755,11 @@ int dsi_panel_set_nolp(struct dsi_panel *panel)
 		DSI_ERR("invalid params\n");
 		return -EINVAL;
 	}
+
+	panel->doze_status = 0;
+
+	if (panel->hbm_mode)
+		dsi_panel_apply_hbm_mode(panel, panel->hbm_mode);
 
 	mutex_lock(&panel->panel_lock);
 
@@ -5165,8 +5180,10 @@ int dsi_panel_enable(struct dsi_panel *panel)
 		return -EINVAL;
 	}
 
+	panel->doze_status = 0;
+
 	if (panel->hbm_mode)
-		dsi_panel_apply_hbm_mode(panel);
+		dsi_panel_apply_hbm_mode(panel, panel->hbm_mode);
 
 	mutex_lock(&panel->panel_lock);
 
@@ -5488,7 +5505,7 @@ error:
 	return rc;
 }
 
-int dsi_panel_apply_hbm_mode(struct dsi_panel *panel)
+int dsi_panel_apply_hbm_mode(struct dsi_panel *panel, int mode)
 {
 	static const enum dsi_cmd_set_type type_map[] = {
 		DSI_CMD_SET_MI_HBM_OFF,
@@ -5509,9 +5526,11 @@ int dsi_panel_apply_hbm_mode(struct dsi_panel *panel)
 	rc = dsi_panel_tx_cmd_set(panel, type);
 	mutex_unlock(&panel->panel_lock);
 
-	if (!mode)
-		ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
-	else
+	if (!mode) {
+		dsi_panel_set_backlight(panel, panel->bl_config.bl_level);
+		if (!panel->hbm_mode)
+			ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
+	} else
 		ea_panel_mode_ctrl(panel, 0);
 
 	return rc;
