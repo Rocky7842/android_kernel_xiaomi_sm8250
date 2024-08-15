@@ -940,6 +940,9 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
         if (bl_lvl > 0)
                 bl_lvl = ea_panel_calc_backlight(bl_lvl < bl_dc_min ? bl_dc_min : bl_lvl);
 
+	if (panel->hbm_mode && !panel->doze_status)
+		goto skip_bl_adj;
+
 	DSI_DEBUG("backlight type:%d lvl:%d\n", bl->type, bl_lvl);
 
 	/* lmi panel must restore to last_bl_level to avoid flash high
@@ -1026,6 +1029,7 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		DSI_INFO("DC off\n");
 		mi_cfg->dc_enable = false;
 	}
+skip_bl_adj:
 	mi_cfg->last_bl_level = bl_lvl;
 	if (bl_lvl)
 		mi_cfg->last_nonzero_bl_level = bl_lvl;
