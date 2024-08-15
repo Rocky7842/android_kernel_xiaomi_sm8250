@@ -5098,7 +5098,8 @@ static ssize_t sysfs_dc_dimming_write(struct device *dev,
 		return count;
 	}
 
-	ea_panel_mode_ctrl(display->panel, dc_dimming_mode != 0);
+	if (!display->panel->hbm_mode)
+		ea_panel_mode_ctrl(display->panel, dc_dimming_mode != 0);
 
 	return count;
 }

@@ -5494,15 +5494,21 @@ int dsi_panel_apply_hbm_mode(struct dsi_panel *panel)
 	enum dsi_cmd_set_type type;
 	int rc;
 
-	if (panel->hbm_mode >= 0 &&
-		panel->hbm_mode < ARRAY_SIZE(type_map))
-		type = type_map[panel->hbm_mode];
-	else
+	if (mode >= 0 &&
+		mode < ARRAY_SIZE(type_map)) {
+		type = type_map[mode];
+	} else {
 		type = type_map[0];
+	}
 
 	mutex_lock(&panel->panel_lock);
 	rc = dsi_panel_tx_cmd_set(panel, type);
 	mutex_unlock(&panel->panel_lock);
+
+	if (!mode)
+		ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
+	else
+		ea_panel_mode_ctrl(panel, 0);
 
 	return rc;
 }
