@@ -1087,7 +1087,7 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 				if (Prepare_Kickoff) {
 					SDE_ATRACE_BEGIN("set_backlight_after_aod");
 					mutex_lock(&dsi_display->panel->panel_lock);
-					dsi_panel_set_backlight(dsi_display->panel, dsi_display->panel->mi_cfg.last_bl_level);
+					dsi_panel_set_backlight(dsi_display->panel, dsi_display->panel->bl_config.real_bl_level);
 					mutex_unlock(&dsi_display->panel->panel_lock);
 					SDE_ATRACE_END("set_backlight_after_aod");
 					SDE_INFO("backlight %d set after aod layer\n", mi_cfg->last_bl_level);
