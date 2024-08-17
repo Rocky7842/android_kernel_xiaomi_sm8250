@@ -4723,6 +4723,9 @@ exit:
 		panel->mi_cfg.bl_enable = true;
 	panel->mi_cfg.bl_wait_frame = false;
 	mutex_unlock(&panel->panel_lock);
+
+	dsi_panel_set_backlight(panel, panel->bl_config.real_bl_level);
+
 	return rc;
 }
 
@@ -4758,6 +4761,9 @@ int dsi_panel_set_lp2(struct dsi_panel *panel)
 		       panel->name, rc);
 exit:
 	mutex_unlock(&panel->panel_lock);
+
+	dsi_panel_set_backlight(panel, panel->bl_config.real_bl_level);
+
 	return rc;
 }
 
