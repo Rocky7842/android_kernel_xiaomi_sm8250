@@ -247,6 +247,8 @@ struct dsi_panel {
 	int hbm_mode;
 	int dc_dimming_mode;
 	bool doze_status;
+
+	struct delayed_work enable_dc_dimming_delayed_work;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)

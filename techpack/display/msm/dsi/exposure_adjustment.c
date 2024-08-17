@@ -28,6 +28,7 @@
 #include "exposure_adjustment.h"
 
 static bool pcc_backlight_enable = false;
+static bool pcc_backlight_add_delay = false;
 static u32 last_level = ELVSS_OFF_THRESHOLD;
 
 static int ea_panel_send_pcc(u32 bl_lvl)
@@ -96,9 +97,11 @@ void ea_panel_mode_ctrl(struct dsi_panel *panel, bool enable)
 {
 	if (pcc_backlight_enable != enable) {
 		pcc_backlight_enable = enable;
+		pcc_backlight_add_delay = true;
 		pr_debug("Recover backlight level = %d\n", last_level);
 		dsi_panel_set_backlight(panel, last_level);
 		if (!enable) {
+			usleep_range(70 * 1000, 71 * 1000);
 			ea_panel_send_pcc(ELVSS_OFF_THRESHOLD);
 		}
 	} else if (last_level == 0 && !pcc_backlight_enable) {
@@ -113,7 +116,10 @@ u32 ea_panel_calc_backlight(u32 bl_lvl)
 	if (pcc_backlight_enable && bl_lvl != 0 && bl_lvl < ELVSS_OFF_THRESHOLD) {
 		if (ea_panel_send_pcc(bl_lvl))
 			pr_err("ERROR: Failed to send PCC\n");
-
+		if (pcc_backlight_add_delay) {
+			pcc_backlight_add_delay = false;
+			usleep_range(20 * 1000, 21 * 1000);
+		}
 		return ELVSS_OFF_THRESHOLD;
 	} else {
 		return bl_lvl;

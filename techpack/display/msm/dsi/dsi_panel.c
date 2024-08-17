@@ -4111,6 +4111,7 @@ void dsi_panel_put(struct dsi_panel *panel)
 	kfree(panel);
 }
 
+static void enable_dc_dimming_delayed_work(struct work_struct *work);
 int dsi_panel_drv_init(struct dsi_panel *panel,
 		       struct mipi_dsi_host *host)
 {
@@ -4121,6 +4122,8 @@ int dsi_panel_drv_init(struct dsi_panel *panel,
 		DSI_ERR("invalid params\n");
 		return -EINVAL;
 	}
+
+	INIT_DELAYED_WORK(&panel->enable_dc_dimming_delayed_work, enable_dc_dimming_delayed_work);
 
 	mutex_lock(&panel->panel_lock);
 
@@ -4683,6 +4686,9 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 		DSI_ERR("invalid params\n");
 		return -EINVAL;
 	}
+
+	cancel_delayed_work(&panel->enable_dc_dimming_delayed_work);
+
 	panel->doze_status = 1;
 
 	if (panel->hbm_mode)
@@ -4733,6 +4739,8 @@ int dsi_panel_set_lp2(struct dsi_panel *panel)
 		return -EINVAL;
 	}
 
+	cancel_delayed_work(&panel->enable_dc_dimming_delayed_work);
+
 	panel->doze_status = 1;
 
 	if (panel->hbm_mode)
@@ -4768,7 +4776,7 @@ int dsi_panel_set_nolp(struct dsi_panel *panel)
 	if (panel->hbm_mode)
 		dsi_panel_apply_hbm_mode(panel, panel->hbm_mode);
 	else if (panel->dc_dimming_mode)
-		ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
+		schedule_delayed_work(&panel->enable_dc_dimming_delayed_work, msecs_to_jiffies(150));
 
 	mutex_lock(&panel->panel_lock);
 
@@ -5191,11 +5199,6 @@ int dsi_panel_enable(struct dsi_panel *panel)
 
 	panel->doze_status = 0;
 
-	if (panel->hbm_mode)
-		dsi_panel_apply_hbm_mode(panel, panel->hbm_mode);
-	else if (panel->dc_dimming_mode)
-		ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
-
 	mutex_lock(&panel->panel_lock);
 
 	mi_cfg = &panel->mi_cfg;
@@ -5250,6 +5253,15 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	mi_cfg->cabc_current_status = 0;
 
 	mutex_unlock(&panel->panel_lock);
+
+	if (panel->dc_dimming_mode && !panel->hbm_mode)
+		dsi_panel_set_backlight(panel, panel->bl_config.real_bl_level);
+
+	if (panel->hbm_mode)
+		dsi_panel_apply_hbm_mode(panel, panel->hbm_mode);
+	else if (panel->dc_dimming_mode)
+		schedule_delayed_work(&panel->enable_dc_dimming_delayed_work, msecs_to_jiffies(150));
+
 	return rc;
 }
 
@@ -5378,6 +5390,11 @@ int dsi_panel_disable(struct dsi_panel *panel)
 		DSI_ERR("invalid params\n");
 		return -EINVAL;
 	}
+
+	cancel_delayed_work(&panel->enable_dc_dimming_delayed_work);
+
+	if (panel->dc_dimming_mode && !panel->hbm_mode)
+		ea_panel_mode_ctrl(panel, 0);
 
 	mutex_lock(&panel->panel_lock);
 
@@ -5545,4 +5562,14 @@ int dsi_panel_apply_hbm_mode(struct dsi_panel *panel, int mode)
 		ea_panel_mode_ctrl(panel, 0);
 
 	return rc;
+}
+
+static void enable_dc_dimming_delayed_work(struct work_struct *work)
+{
+	struct dsi_panel *panel = container_of(work,
+				struct dsi_panel, enable_dc_dimming_delayed_work.work);
+	if (panel->mi_cfg.fod_hbm_enabled)
+		schedule_delayed_work(&panel->enable_dc_dimming_delayed_work, msecs_to_jiffies(500));
+	else
+		ea_panel_mode_ctrl(panel, panel->dc_dimming_mode);
 }
