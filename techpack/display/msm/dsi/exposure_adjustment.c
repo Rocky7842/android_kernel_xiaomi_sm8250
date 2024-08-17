@@ -94,7 +94,7 @@ static int ea_panel_send_pcc(u32 bl_lvl)
 
 void ea_panel_mode_ctrl(struct dsi_panel *panel, bool enable)
 {
-	if (pcc_backlight_enable != enable) {
+	if (pcc_backlight_enable != enable && (!panel->doze_status || !enable)) {
 		pcc_backlight_enable = enable;
 		pcc_backlight_add_delay = true;
 		pr_debug("Recover backlight level = %d\n", panel->bl_config.real_bl_level);
