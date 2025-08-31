@@ -2580,29 +2580,6 @@ static bool is_charging_paused(struct smb_charger *chg)
 	return val & CHARGING_PAUSE_CMD_BIT;
 }
 
-int smblib_get_prop_battery_charging_enabled(struct smb_charger *chg,
-					union power_supply_propval *val)
-{
-	int icl = 0;
-	if (chg->is_qc_class_a && !chg->qc3_raise_done)
-		icl = MAIN_ICL_MIN;
-
-	if (chg->six_pin_step_charge_enable) {
-		val->intval = !(get_client_vote(chg->usb_icl_votable, MAIN_ICL_MIN_VOTER)
-				== MAIN_ICL_MIN);
-	}
-	else {
-		if (chg->power_good_en)
-			val->intval = !(get_client_vote(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER)
-					== MAIN_CHG_SUSPEND_ICL);
-		else
-			val->intval = !(get_client_vote(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER)
-					== icl);
-	}
-	return 0;
-}
-
-
 int smblib_get_prop_batt_status(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
@@ -3675,38 +3652,6 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 		schedule_delayed_work(&chg->thermal_setting_work, 3 * HZ);
 	else
 		smblib_therm_charging(chg);
-
-	return 0;
-}
-
-int smblib_set_prop_battery_charging_enabled(struct smb_charger *chg,
-				const union power_supply_propval *val)
-{
-	int icl = 0;
-	if (chg->is_qc_class_a && !chg->qc3_raise_done)
-		icl = MAIN_ICL_MIN;
-
-	if (val->intval == 0) {
-		if (chg->six_pin_step_charge_enable) {
-			vote(chg->usb_icl_votable, MAIN_ICL_MIN_VOTER,
-						true, MAIN_ICL_MIN);
-		}
-		else {
-			if (chg->power_good_en)
-				vote(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER,
-						true, MAIN_CHG_SUSPEND_ICL);
-			else
-				vote(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER,
-						true, icl);
-		}
-	} else {
-		if (chg->six_pin_step_charge_enable)
-			vote(chg->usb_icl_votable, MAIN_ICL_MIN_VOTER,
-						false, 0);
-		else
-			vote(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER,
-						false, 0);
-	}
 
 	return 0;
 }
