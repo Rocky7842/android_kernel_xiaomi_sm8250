@@ -4,10 +4,10 @@ source "techpack/data/Kconfig"
 
 menu "Camera packages"
 
-config TECHPACK_CAMERA_XIAOMI
-    bool "Xiaomi camera"
+config TECHPACK_CAMERA_XIAOMI_NONEDXO
+    bool "Xiaomi camera nonedxo"
     help
-      Xiaomi camera
+      Xiaomi camera nonedxo
 
 config TECHPACK_CAMERA_XIAOMI_CAS
     bool "Xiaomi camera CAS"
