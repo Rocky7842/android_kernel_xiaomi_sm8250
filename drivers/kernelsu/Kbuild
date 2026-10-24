@@ -98,6 +98,9 @@ $(info -- KernelSU-Next version fallback: $(KSU_VERSION_FALLBACK))
 KSU_VERSION := $(KSU_VERSION_FALLBACK)
 endif
 
+KSU_VERSION_OVERRIDE := 33315
+$(warning "KSU_VERSION override: $(KSU_VERSION_OVERRIDE)")
+
 # Allow integrators to pin the reported version (e.g. when backporting
 # onto release branches where the commit count does not match releases)
 # legacy: keep version derived from commit count, with a +289 offset so
@@ -116,6 +119,9 @@ $(warning "KSU_VERSION_TAG not defined! It is better to make KernelSU-Next a git
 KSU_VERSION_TAG_FALLBACK := v0.0.1
 KSU_VERSION_TAG=$(KSU_VERSION_TAG_FALLBACK)
 endif
+
+KSU_VERSION_TAG_OVERRIDE := v3.4.0-legacy
+$(warning "KSU_VERSION_TAG override: $(KSU_VERSION_TAG_OVERRIDE)")
 
 ifdef KSU_VERSION_TAG_OVERRIDE
 KSU_VERSION_TAG := $(KSU_VERSION_TAG_OVERRIDE)
