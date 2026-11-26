@@ -33,6 +33,7 @@
 #include "runtime/ksud_boot.h"
 #include "compat/kernel_compat.h"
 #include "sucompat.h"
+#include "feature/adb_root.h"
 #include "policy/app_profile.h"
 #include "selinux/selinux.h"
 #include "sulog/event.h"
@@ -258,14 +259,23 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 	if (unlikely(!filename_ptr))
 		return 0;
 
+	filename = *filename_ptr;
+	if (IS_ERR(filename))
+		return 0;
+
+	if (static_branch_unlikely(&ksu_adb_root) &&
+	    current->pid != 1 && is_init(current_cred())) {
+		long adb_ret = ksu_adb_root_handle_execve_manual(
+			filename, (struct user_arg_ptr *)__never_use_envp);
+		if (adb_ret)
+			pr_err("adb root failed: %ld\n", adb_ret);
+		return 0;
+	}
+
 	if (!ksu_su_compat_enabled)
 		return 0;
 
 	if (!ksu_is_allow_uid_for_current(current_uid().val))
-		return 0;
-
-	filename = *filename_ptr;
-	if (IS_ERR(filename))
 		return 0;
 
 	if (likely(memcmp(filename->name, su, sizeof(su))))

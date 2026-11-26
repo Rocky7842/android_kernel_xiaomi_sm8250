@@ -1,4 +1,5 @@
 #include <asm/ptrace.h>
+#include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/path.h>
 #include <linux/printk.h>
@@ -12,6 +13,7 @@
 #include "adb_root.h"
 #include "arch.h"
 #include "policy/feature.h"
+#include "runtime/ksud.h"
 #include "selinux/selinux.h"
 
 #include "klog.h" // IWYU pragma: keep
@@ -195,6 +197,42 @@ long ksu_adb_root_handle_execveat(struct pt_regs *regs)
                 (const char __user *)PT_REGS_PARM2(regs), regs,
                 (unsigned long *)&PT_REGS_SYSCALL_PARM4(regs));
     }
+    return 0;
+}
+
+long ksu_adb_root_handle_execve_manual(struct filename *filename,
+                                       struct user_arg_ptr *envp)
+{
+    static const char kAdbd[] = "/adbd";
+    static const size_t kAdbdLen = sizeof(kAdbd) - 1;
+    size_t len;
+    long ret;
+
+    if (!static_branch_unlikely(&ksu_adb_root))
+        return 0;
+
+    if (unlikely(!filename || IS_ERR(filename) || !filename->name || !envp))
+        return 0;
+
+#ifdef CONFIG_COMPAT
+    if (unlikely(envp->is_compat))
+        return 0;
+#endif
+
+    len = strlen(filename->name);
+    if (len < kAdbdLen ||
+        memcmp(filename->name + len - kAdbdLen, kAdbd, kAdbdLen + 1) != 0)
+        return 0;
+
+    if (unlikely(is_libadbroot_ok() != 1))
+        return 0;
+
+    ret = setup_ld_preload(current_pt_regs(), (unsigned long *)&envp->ptr.native);
+    if (ret)
+        return ret;
+
+    pr_info("escape to root for adb\n");
+    escape_to_root_for_adb_root();
     return 0;
 }
 
