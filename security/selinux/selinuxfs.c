@@ -603,7 +603,7 @@ static const struct file_operations sel_load_ops = {
 static ssize_t sel_write_context(struct file *file, char *buf, size_t size)
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
-	struct selinux_state *state = fsi->state;
+	struct selinux_state *state = ksu_selinux_query_state(fsi->state);
 	char *canon = NULL;
 	u32 sid, len;
 	ssize_t length;
@@ -823,7 +823,7 @@ static const struct file_operations transaction_ops = {
 static ssize_t sel_write_access(struct file *file, char *buf, size_t size)
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
-	struct selinux_state *state = fsi->state;
+	struct selinux_state *state = ksu_selinux_query_state(fsi->state);
 	char *scon = NULL, *tcon = NULL;
 	u32 ssid, tsid;
 	u16 tclass;
@@ -874,7 +874,7 @@ out:
 static ssize_t sel_write_create(struct file *file, char *buf, size_t size)
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
-	struct selinux_state *state = fsi->state;
+	struct selinux_state *state = ksu_selinux_query_state(fsi->state);
 	char *scon = NULL, *tcon = NULL;
 	char *namebuf = NULL, *objname = NULL;
 	u32 ssid, tsid, newsid;
@@ -978,7 +978,7 @@ out:
 static ssize_t sel_write_relabel(struct file *file, char *buf, size_t size)
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
-	struct selinux_state *state = fsi->state;
+	struct selinux_state *state = ksu_selinux_query_state(fsi->state);
 	char *scon = NULL, *tcon = NULL;
 	u32 ssid, tsid, newsid;
 	u16 tclass;
@@ -1039,7 +1039,7 @@ out:
 static ssize_t sel_write_user(struct file *file, char *buf, size_t size)
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
-	struct selinux_state *state = fsi->state;
+	struct selinux_state *state = ksu_selinux_query_state(fsi->state);
 	char *con = NULL, *user = NULL, *ptr;
 	u32 sid, *sids = NULL;
 	ssize_t length;
@@ -1104,7 +1104,7 @@ out:
 static ssize_t sel_write_member(struct file *file, char *buf, size_t size)
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
-	struct selinux_state *state = fsi->state;
+	struct selinux_state *state = ksu_selinux_query_state(fsi->state);
 	char *scon = NULL, *tcon = NULL;
 	u32 ssid, tsid, newsid;
 	u16 tclass;

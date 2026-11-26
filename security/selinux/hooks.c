@@ -6346,12 +6346,24 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
 
 	/* Obtain a SID for the context, if one was specified. */
 	if (size && str[0] && str[0] != '\n') {
+#if IS_ENABLED(CONFIG_KSU)
+		struct selinux_state *query_state =
+			ksu_selinux_query_state(&selinux_state);
+#endif
 		if (str[size-1] == '\n') {
 			str[size-1] = 0;
 			size--;
 		}
+#if IS_ENABLED(CONFIG_KSU)
+		error = security_context_to_sid(query_state, value, size,
+						&sid, GFP_KERNEL);
+		if (!error && query_state != &selinux_state)
+			error = security_context_to_sid(&selinux_state, value,
+							size, &sid, GFP_KERNEL);
+#else
 		error = security_context_to_sid(&selinux_state, value, size,
 						&sid, GFP_KERNEL);
+#endif
 		if (error == -EINVAL && !strcmp(name, "fscreate")) {
 			if (!has_cap_mac_admin(true)) {
 				struct audit_buffer *ab;

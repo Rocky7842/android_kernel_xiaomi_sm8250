@@ -443,4 +443,14 @@ extern void selinux_nlmsg_init(void);
 extern int security_sidtab_hash_stats(struct selinux_state *state, char *page);
 extern void selinux_nlmsg_init(void);
 
+#if IS_ENABLED(CONFIG_KSU)
+extern void ksu_set_selinux_hide_enabled(bool enabled);
+extern struct selinux_state *ksu_selinux_query_state(struct selinux_state *orig);
+#else
+static inline struct selinux_state *ksu_selinux_query_state(struct selinux_state *orig)
+{
+	return orig;
+}
+#endif
+
 #endif /* _SELINUX_SECURITY_H_ */

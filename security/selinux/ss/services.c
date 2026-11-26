@@ -47,6 +47,7 @@
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/sched.h>
+#include <linux/cred.h>
 #include <linux/audit.h>
 #include <linux/mutex.h>
 #include <linux/flex_array.h>
@@ -2126,6 +2127,130 @@ static void security_load_policycaps(struct selinux_state *state)
 static int security_preserve_bools(struct selinux_state *state,
 				   struct policydb *newpolicydb);
 
+#if IS_ENABLED(CONFIG_KSU)
+static struct selinux_ss ksu_backup_ss;
+static struct selinux_state ksu_backup_selinux_state;
+static DEFINE_MUTEX(ksu_backup_lock);
+static bool ksu_selinux_hide_active __read_mostly = true;
+
+void ksu_set_selinux_hide_enabled(bool enabled)
+{
+	WRITE_ONCE(ksu_selinux_hide_active, enabled);
+}
+EXPORT_SYMBOL_GPL(ksu_set_selinux_hide_enabled);
+
+struct selinux_state *ksu_selinux_query_state(struct selinux_state *orig)
+{
+	if (likely(READ_ONCE(ksu_selinux_hide_active)) &&
+	    current_uid().val >= 10000 &&
+	    orig == &selinux_state &&
+	    selinux_initialized(&ksu_backup_selinux_state))
+		return &ksu_backup_selinux_state;
+
+	return orig;
+}
+
+static void ksu_update_backup_policy(struct selinux_state *state,
+				     void *data, size_t len)
+{
+	struct policydb *newpolicydb = NULL;
+	struct policydb *oldpolicydb = NULL;
+	struct sidtab *newsidtab = NULL;
+	struct sidtab *oldsidtab = NULL;
+	struct selinux_map newmap = { 0 };
+	struct selinux_mapping *oldmapping = NULL;
+	struct policy_file file = { data, len };
+	bool had_backup;
+	int rc;
+
+	if (state != &selinux_state)
+		return;
+
+	newpolicydb = kzalloc(sizeof(*newpolicydb), GFP_KERNEL);
+	if (!newpolicydb)
+		return;
+
+	newsidtab = kmalloc(sizeof(*newsidtab), GFP_KERNEL);
+	if (!newsidtab) {
+		kfree(newpolicydb);
+		return;
+	}
+
+	rc = policydb_read(newpolicydb, &file);
+	if (rc) {
+		kfree(newsidtab);
+		kfree(newpolicydb);
+		return;
+	}
+
+	newpolicydb->len = len;
+	rc = selinux_set_mapping(newpolicydb, secclass_map, &newmap);
+	if (rc)
+		goto err_map;
+
+	rc = policydb_load_isids(newpolicydb, newsidtab);
+	if (rc)
+		goto err_map;
+
+	mutex_lock(&ksu_backup_lock);
+	had_backup = selinux_initialized(&ksu_backup_selinux_state);
+	if (!had_backup) {
+		rwlock_init(&ksu_backup_ss.policy_rwlock);
+		mutex_init(&ksu_backup_ss.status_lock);
+		ksu_backup_selinux_state.ss = &ksu_backup_ss;
+	} else {
+		oldpolicydb = kzalloc(sizeof(*oldpolicydb), GFP_KERNEL);
+		if (!oldpolicydb) {
+			mutex_unlock(&ksu_backup_lock);
+			goto err_sidtab;
+		}
+	}
+
+	write_lock_irq(&ksu_backup_ss.policy_rwlock);
+	if (had_backup) {
+		memcpy(oldpolicydb, &ksu_backup_ss.policydb, sizeof(*oldpolicydb));
+		oldsidtab = ksu_backup_ss.sidtab;
+		oldmapping = ksu_backup_ss.map.mapping;
+		ksu_backup_ss.latest_granting++;
+	} else {
+		ksu_backup_ss.latest_granting = 1;
+	}
+	memcpy(&ksu_backup_ss.policydb, newpolicydb, sizeof(*newpolicydb));
+	ksu_backup_ss.sidtab = newsidtab;
+	ksu_backup_ss.map = newmap;
+	ksu_backup_selinux_state.enforcing = state->enforcing;
+	ksu_backup_selinux_state.checkreqprot = state->checkreqprot;
+	memcpy(ksu_backup_selinux_state.policycap, state->policycap,
+	       sizeof(ksu_backup_selinux_state.policycap));
+	ksu_backup_selinux_state.android_netlink_route = state->android_netlink_route;
+	ksu_backup_selinux_state.android_netlink_getneigh = state->android_netlink_getneigh;
+	if (!had_backup)
+		selinux_mark_initialized(&ksu_backup_selinux_state);
+	write_unlock_irq(&ksu_backup_ss.policy_rwlock);
+
+	if (had_backup) {
+		policydb_destroy(oldpolicydb);
+		kfree(oldpolicydb);
+		sidtab_destroy(oldsidtab);
+		kfree(oldsidtab);
+		kfree(oldmapping);
+	}
+	mutex_unlock(&ksu_backup_lock);
+	kfree(newpolicydb);
+	pr_info("selinux_hide: backup policy ready (seqno=%u)\n",
+		ksu_backup_ss.latest_granting);
+	return;
+
+err_sidtab:
+	sidtab_destroy(newsidtab);
+err_map:
+	kfree(newmap.mapping);
+	policydb_destroy(newpolicydb);
+	kfree(newpolicydb);
+	kfree(newsidtab);
+}
+#endif
+
 /**
  * security_load_policy - Load a security policy configuration.
  * @data: binary policy data
@@ -2197,6 +2322,9 @@ int security_load_policy(struct selinux_state *state, void *data, size_t len)
 		selinux_status_update_policyload(state, seqno);
 		selinux_netlbl_cache_invalidate();
 		selinux_xfrm_notify_policyload();
+#if IS_ENABLED(CONFIG_KSU)
+		ksu_update_backup_policy(state, data, len);
+#endif
 		goto out;
 	}
 
@@ -2278,6 +2406,9 @@ int security_load_policy(struct selinux_state *state, void *data, size_t len)
 	selinux_status_update_policyload(state, seqno);
 	selinux_netlbl_cache_invalidate();
 	selinux_xfrm_notify_policyload();
+#if IS_ENABLED(CONFIG_KSU)
+	ksu_update_backup_policy(state, data, len);
+#endif
 
 	rc = 0;
 	goto out;
