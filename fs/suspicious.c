@@ -55,6 +55,14 @@ static uid_t getuid(void) {
 	
 }
 
+static bool suspicious_path_match(const char *path, const char *prefix)
+{
+	size_t len = strlen(prefix);
+
+	return strncmp(path, prefix, len) == 0 &&
+	       (path[len] == '\0' || path[len] == '/');
+}
+
 int is_suspicious_path(const struct path* const file)
 {
 	
@@ -70,21 +78,21 @@ int is_suspicious_path(const struct path* const file)
 	path = kmalloc(size, GFP_KERNEL);
 	
 	if (path == NULL) {
-		status = -1;
+		status = 0;
 		goto out;
 	}
 	
 	ptr = d_path(file, path, size);
 	
 	if (IS_ERR(ptr)) {
-		status = -1;
+		status = 0;
 		goto out;
 	}
 	
 	end = mangle_path(path, ptr, " \t\n\\");
 	
 	if (!end) {
-		status = -1;
+		status = 0;
 		goto out;
 	}
 	
@@ -94,7 +102,7 @@ int is_suspicious_path(const struct path* const file)
 	for (index = 0; index < ARRAY_SIZE(suspicious_paths); index++) {
 		const char* const name = suspicious_paths[index];
 		
-		if (memcmp(name, path, strlen(name)) == 0) {
+		if (suspicious_path_match(path, name)) {
 			printk(KERN_INFO "suspicious-fs: file or directory access to suspicious path '%s' won't be allowed to process with UID %i\n", name, getuid());
 			
 			status = 1;
@@ -115,11 +123,7 @@ int suspicious_path(const struct filename* const name)
 	int status = 0, ret = 0;
 	struct path path;
 	
-	if (IS_ERR(name)) {
-		return -1;
-	}
-	
-	if (!uid_matches() || name == NULL) {
+	if (!uid_matches() || IS_ERR_OR_NULL(name)) {
 		return 0;
 	}
 	
@@ -132,6 +136,23 @@ int suspicious_path(const struct filename* const name)
 	
 	return status;
 	
+}
+
+int is_suspicious_user_path(const char __user *pathname)
+{
+	struct filename *fname;
+	int status;
+
+	if (!uid_matches() || !pathname)
+		return 0;
+
+	fname = getname(pathname);
+	if (IS_ERR(fname))
+		return 0;
+
+	status = suspicious_path(fname);
+	putname(fname);
+	return status;
 }
 
 int is_suspicious_mount(struct vfsmount* const mnt, const struct path* const root)
@@ -167,21 +188,21 @@ int is_suspicious_mount(struct vfsmount* const mnt, const struct path* const roo
 	path = kmalloc(size, GFP_KERNEL);
 	
 	if (path == NULL) {
-		status = -1;
+		status = 0;
 		goto out;
 	}
 	
 	ptr = __d_path(&mnt_path, root, path, size);
 	
 	if (!ptr) {
-		status = -1;
+		status = 0;
 		goto out;
 	}
 	
 	end = mangle_path(path, ptr, " \t\n\\");
 	
 	if (!end) {
-		status = -1;
+		status = 0;
 		goto out;
 	}
 	
@@ -191,7 +212,7 @@ int is_suspicious_mount(struct vfsmount* const mnt, const struct path* const roo
 	for (index = 0; index < ARRAY_SIZE(suspicious_mount_paths); index++) {
 		const char* const name = suspicious_mount_paths[index];
 		
-		if (memcmp(path, name, strlen(name)) == 0) {
+		if (suspicious_path_match(path, name)) {
 			printk(KERN_INFO "suspicious-fs: mount point with suspicious path '%s' won't be shown to process with UID %i\n", path, getuid());
 			
 			status = 1;

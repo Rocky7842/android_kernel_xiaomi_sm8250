@@ -3901,20 +3901,13 @@ long do_mknodat(int dfd, const char __user *filename, umode_t mode,
 	struct path path;
 	int error;
 	unsigned int lookup_flags = 0;
-	struct filename* fname;
-	int status;
-
-	fname = getname_safe(filename);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
-		return -ENOENT;
-	}
 
 	error = may_mknod(mode);
 	if (error)
 		return error;
+
+	if (is_suspicious_user_path(filename))
+		return -ENOENT;
 retry:
 	dentry = user_path_create(dfd, filename, &path, lookup_flags);
 	if (IS_ERR(dentry))
@@ -3997,16 +3990,9 @@ long do_mkdirat(int dfd, const char __user *pathname, umode_t mode)
 	struct path path;
 	int error;
 	unsigned int lookup_flags = LOOKUP_DIRECTORY;
-	struct filename* fname;
-	int status;
 
-	fname = getname_safe(pathname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
+	if (is_suspicious_user_path(pathname))
 		return -ENOENT;
-	}
 
 retry:
 	dentry = user_path_create(dfd, pathname, &path, lookup_flags);
@@ -4090,16 +4076,9 @@ long do_rmdir(int dfd, const char __user *pathname)
 	struct qstr last;
 	int type;
 	unsigned int lookup_flags = 0;
-	struct filename* fname;
-	int status;
 
-	fname = getname_safe(pathname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
+	if (is_suspicious_user_path(pathname))
 		return -ENOENT;
-	}
 retry:
 	name = filename_parentat(dfd, getname(pathname), lookup_flags,
 				&path, &last, &type);
@@ -4241,7 +4220,8 @@ retry:
 		return PTR_ERR(name);
 
 	if (suspicious_path(name)) {
-		return -ENOENT;
+		error = -ENOENT;
+		goto exit1;
 	}
 
 	error = -EISDIR;
@@ -4351,24 +4331,9 @@ long do_symlinkat(const char __user *oldname, int newdfd,
 	struct dentry *dentry;
 	struct path path;
 	unsigned int lookup_flags = 0;
-	struct filename* fname;
-	int status;
 
-	fname = getname_safe(oldname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
+	if (is_suspicious_user_path(oldname) || is_suspicious_user_path(newname))
 		return -ENOENT;
-	}
-
-	fname = getname_safe(newname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
-		return -ENOENT;
-	}
 
 	from = getname(oldname);
 	if (IS_ERR(from))
@@ -4506,24 +4471,6 @@ int do_linkat(int olddfd, const char __user *oldname, int newdfd,
 	struct inode *delegated_inode = NULL;
 	int how = 0;
 	int error;
-	struct filename* fname;
-	int status;
-
-	fname = getname_safe(oldname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
-		return -ENOENT;
-	}
-
-	fname = getname_safe(newname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
-		return -ENOENT;
-	}
 
 	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0)
 		return -EINVAL;
@@ -4537,6 +4484,9 @@ int do_linkat(int olddfd, const char __user *oldname, int newdfd,
 			return -ENOENT;
 		how = LOOKUP_EMPTY;
 	}
+
+	if (is_suspicious_user_path(oldname) || is_suspicious_user_path(newname))
+		return -ENOENT;
 
 	if (flags & AT_SYMLINK_FOLLOW)
 		how |= LOOKUP_FOLLOW;
@@ -4790,24 +4740,6 @@ static int do_renameat2(int olddfd, const char __user *oldname, int newdfd,
 	unsigned int lookup_flags = 0, target_flags = LOOKUP_RENAME_TARGET;
 	bool should_retry = false;
 	int error;
-	struct filename* fname;
-	int status;
-
-	fname = getname_safe(oldname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
-		return -ENOENT;
-	}
-
-	fname = getname_safe(newname);
-	status = suspicious_path(fname);
-	putname_safe(fname);
-
-	if (status) {
-		return -ENOENT;
-	}
 
 	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE | RENAME_WHITEOUT))
 		return -EINVAL;
@@ -4822,6 +4754,9 @@ static int do_renameat2(int olddfd, const char __user *oldname, int newdfd,
 	if (flags & RENAME_EXCHANGE)
 		target_flags = 0;
 
+	if (is_suspicious_user_path(oldname) || is_suspicious_user_path(newname))
+		return -ENOENT;
+
 retry:
 	from = filename_parentat(olddfd, getname(oldname), lookup_flags,
 				&old_path, &old_last, &old_type);
@@ -4832,7 +4767,7 @@ retry:
  
 	if (suspicious_path(from)) {
 		error = -ENOENT;
-		goto exit;
+		goto exit1;
 	}
 
 	to = filename_parentat(newdfd, getname(newname), lookup_flags,
@@ -4844,7 +4779,7 @@ retry:
 
 	if (suspicious_path(to)) {
 		error = -ENOENT;
-		goto exit;
+		goto exit2;
 	}
 
 	error = -EXDEV;
