@@ -251,8 +251,9 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 	struct filename *filename;
 	const char su[] = SU_PATH;
 	static const char ksud_path[] = KSUD_PATH;
+	static const char sh_path[] = SH_PATH;
 	struct ksu_sulog_pending_event *pending_root = NULL;
-	const char *const *sucompat_argv = (const char *const *)__never_use_argv;
+	struct file *f;
 
 	if (unlikely(!filename_ptr))
 		return 0;
@@ -272,11 +273,19 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 
 	pr_info("do_execveat_common su found\n");
 
-	pending_root = ksu_sulog_capture_root_execve_kern(filename->name, sucompat_argv, GFP_KERNEL);
-
-	memcpy((void *)filename->name, ksud_path, sizeof(ksud_path));
+	pending_root = ksu_sulog_capture_root_execve_kern(filename->name, NULL, GFP_KERNEL);
 
 	escape_with_root_profile();
+
+	f = ksu_filp_open_compat(KSUD_PATH, O_RDONLY, 0);
+	if (IS_ERR(f)) {
+		pr_warn("ksud inaccessible, fallback to sh\n");
+		memcpy((void *)filename->name, sh_path, sizeof(sh_path));
+	} else {
+		filp_close(f, NULL);
+		memcpy((void *)filename->name, ksud_path, sizeof(ksud_path));
+	}
+
 	ksu_sulog_emit_pending(pending_root, 0, GFP_KERNEL);
 
 	return 0;
