@@ -176,7 +176,7 @@ bool ksu_init_rc_hook __read_mostly = true;
 
 // These are referenced directly from patched kernel sources (manual hook
 // integration points), so they must exist in every build configuration
-bool __maybe_unused ksu_vfs_read_hook = true;
+bool ksu_vfs_read_hook __read_mostly = true;
 bool ksu_input_hook __read_mostly = true;
 bool ksu_execveat_hook __read_mostly = true;
 
@@ -1046,6 +1046,7 @@ void stop_init_rc_hook()
     pr_info("unregister init_rc_hook kprobe: %d!\n", ret);
 #else
 	ksu_init_rc_hook = false;
+	ksu_vfs_read_hook = false;
 	pr_info("stop init_rc_hook\n");
 #endif
 }
